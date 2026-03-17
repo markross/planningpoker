@@ -1,9 +1,20 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { AuthProvider } from './contexts/AuthContext'
+import { HomePage } from './pages/HomePage'
+import { SessionPage } from './pages/SessionPage'
+import { NotFoundPage } from './pages/NotFoundPage'
 import './app.css'
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <h1 className="text-3xl font-bold text-gray-900">Planning Poker</h1>
-    </div>
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/session/:sessionCode" element={<SessionPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
   )
 }
