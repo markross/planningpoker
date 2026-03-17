@@ -9,6 +9,10 @@ import { NameEntry } from '../components/home/NameEntry'
 import { Button } from '../components/ui/Button'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
+import { useRealtimeChannel } from '../hooks/useRealtimeChannel'
+import { usePresence } from '../hooks/usePresence'
+import { useVoteChanges } from '../hooks/useVoteChanges'
+import { useBroadcast } from '../hooks/useBroadcast'
 import { createSessionRepository } from '../repositories/sessionRepository'
 import { createPlayerRepository } from '../repositories/playerRepository'
 import { createVoteRepository } from '../repositories/voteRepository'
@@ -44,6 +48,34 @@ export function SessionPage() {
 
   const currentPlayer = players.find((p) => p.userId === userId)
   const gamePhase = derivePhase(votes, session?.isRevealed ?? false)
+
+  // Realtime channel
+  const channel = useRealtimeChannel(sessionCode)
+  usePresence(channel, userId, displayName)
+
+  // Handle incoming vote changes via realtime
+  const handleVoteChange = useCallback((vote: Vote) => {
+    setVotes((prev) => new Map([...prev, [vote.playerId, vote]]))
+  }, [])
+
+  useVoteChanges(channel, session?.id ?? null, handleVoteChange)
+
+  // Handle broadcast reveal/clear from other clients
+  const handleRemoteReveal = useCallback(() => {
+    setSession((prev) => (prev ? { ...prev, isRevealed: true } : prev))
+  }, [])
+
+  const handleRemoteClear = useCallback(() => {
+    setSession((prev) => (prev ? { ...prev, isRevealed: false } : prev))
+    setVotes(new Map())
+    setSelectedEstimate(null)
+  }, [])
+
+  const { broadcastReveal, broadcastClear } = useBroadcast(
+    channel,
+    handleRemoteReveal,
+    handleRemoteClear,
+  )
 
   // Load session data
   useEffect(() => {
@@ -87,7 +119,6 @@ export function SessionPage() {
         const player = await playerRepo.create(session.id, userId, displayName)
         setPlayers((prev) => [...prev, player])
       } catch {
-        // Already joined (unique constraint) — reload players
         const playerRepo = createPlayerRepository(supabase)
         const sessionPlayers = await playerRepo.findBySession(session.id)
         setPlayers(sessionPlayers)
@@ -119,10 +150,11 @@ export function SessionPage() {
       const sessionRepo = createSessionRepository(supabase)
       await sessionRepo.updateRevealed(session.id, true)
       setSession({ ...session, isRevealed: true })
+      broadcastReveal()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to reveal votes')
     }
-  }, [session])
+  }, [session, broadcastReveal])
 
   const handleClear = useCallback(async () => {
     if (!session) return
@@ -134,10 +166,11 @@ export function SessionPage() {
       setSession({ ...session, isRevealed: false })
       setVotes(new Map())
       setSelectedEstimate(null)
+      broadcastClear()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to clear votes')
     }
-  }, [session])
+  }, [session, broadcastClear])
 
   if (authLoading || isLoading) {
     return (

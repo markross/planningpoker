@@ -2,9 +2,10 @@ import { render, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
 import { CardDeck } from './CardDeck'
+import type { Estimate } from '../../constants/estimates'
 
 function renderDeck(props: Partial<Parameters<typeof CardDeck>[0]> = {}) {
-  const defaultProps = { selectedEstimate: null as string | null, onSelect: vi.fn() }
+  const defaultProps = { selectedEstimate: null as Estimate | null, onSelect: vi.fn() }
   const result = render(<CardDeck {...defaultProps} {...props} />)
   const group = within(result.container).getByRole('group', {
     name: 'Estimate cards',
