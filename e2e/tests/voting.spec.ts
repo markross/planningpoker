@@ -121,12 +121,9 @@ test.describe('Voting flow', () => {
     // Bob joins (own browser context = isolated storage)
     const bobPage = await joinSessionAsUser(browser, sessionCode, 'Bob')
 
-    // Bob's page should show both players (loaded fresh from DB)
+    // Both should see each other via realtime player subscription
     await expect(bobPage.getByText('Alice')).toBeVisible({ timeout: 10_000 })
     await expect(bobPage.getByText('Bob')).toBeVisible({ timeout: 10_000 })
-
-    // Alice needs to reload to see Bob (player list is loaded once on mount)
-    await alicePage.reload()
     await expect(alicePage.getByText('Bob')).toBeVisible({ timeout: 10_000 })
 
     // Alice votes 5
@@ -137,30 +134,26 @@ test.describe('Voting flow', () => {
     const bobCards = bobPage.getByRole('group', { name: 'Estimate cards' })
     await bobCards.getByRole('button', { name: '8', exact: true }).click()
 
-    // Both should see "Voting in progress"
-    await expect(alicePage.getByText('Voting in progress')).toBeVisible({ timeout: 5000 })
-    await expect(bobPage.getByText('Voting in progress')).toBeVisible({ timeout: 5000 })
+    // Both should see "Voting in progress" via realtime vote subscription
+    await expect(alicePage.getByText('Voting in progress')).toBeVisible({ timeout: 10_000 })
+    await expect(bobPage.getByText('Voting in progress')).toBeVisible({ timeout: 10_000 })
 
     // Alice reveals
     await alicePage.getByRole('button', { name: 'Reveal votes' }).click()
 
-    // Alice should see results immediately
+    // Both should see results via broadcast
     await expect(alicePage.getByText('Votes revealed')).toBeVisible({ timeout: 5000 })
+    await expect(bobPage.getByText('Votes revealed')).toBeVisible({ timeout: 10_000 })
+
+    // Results visible on Alice's page
     await expect(alicePage.getByText('Results')).toBeVisible()
     await expect(alicePage.getByText('Average')).toBeVisible()
-
-    // Bob reloads to see revealed state from DB (broadcast is fire-and-forget)
-    await bobPage.reload()
-    await expect(bobPage.getByText('Votes revealed')).toBeVisible({ timeout: 10_000 })
 
     // Bob clicks new round
     await bobPage.getByRole('button', { name: 'New round' }).click()
 
-    // Bob should reset immediately
+    // Both should reset via broadcast
     await expect(bobPage.getByText('Waiting for votes')).toBeVisible({ timeout: 5000 })
-
-    // Alice reloads to see cleared state
-    await alicePage.reload()
     await expect(alicePage.getByText('Waiting for votes')).toBeVisible({ timeout: 10_000 })
 
     await alicePage.close()

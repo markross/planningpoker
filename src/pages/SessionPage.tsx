@@ -9,10 +9,7 @@ import { NameEntry } from '../components/home/NameEntry'
 import { Button } from '../components/ui/Button'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
-import { useRealtimeChannel } from '../hooks/useRealtimeChannel'
-import { usePresence } from '../hooks/usePresence'
-import { useVoteChanges } from '../hooks/useVoteChanges'
-import { useBroadcast } from '../hooks/useBroadcast'
+import { useSessionRealtime } from '../hooks/useSessionRealtime'
 import { createSessionRepository } from '../repositories/sessionRepository'
 import { createPlayerRepository } from '../repositories/playerRepository'
 import { createVoteRepository } from '../repositories/voteRepository'
@@ -49,18 +46,18 @@ export function SessionPage() {
   const currentPlayer = players.find((p) => p.userId === userId)
   const gamePhase = derivePhase(votes, session?.isRevealed ?? false)
 
-  // Realtime channel
-  const channel = useRealtimeChannel(sessionCode)
-  usePresence(channel, userId, displayName)
-
-  // Handle incoming vote changes via realtime
+  // Realtime callbacks
   const handleVoteChange = useCallback((vote: Vote) => {
     setVotes((prev) => new Map([...prev, [vote.playerId, vote]]))
   }, [])
 
-  useVoteChanges(channel, session?.id ?? null, handleVoteChange)
+  const handlePlayerJoin = useCallback((player: Player) => {
+    setPlayers((prev) => {
+      if (prev.some((p) => p.id === player.id)) return prev
+      return [...prev, player]
+    })
+  }, [])
 
-  // Handle broadcast reveal/clear from other clients
   const handleRemoteReveal = useCallback(() => {
     setSession((prev) => (prev ? { ...prev, isRevealed: true } : prev))
   }, [])
@@ -71,11 +68,17 @@ export function SessionPage() {
     setSelectedEstimate(null)
   }, [])
 
-  const { broadcastReveal, broadcastClear } = useBroadcast(
-    channel,
-    handleRemoteReveal,
-    handleRemoteClear,
-  )
+  // Single coordinated realtime hook — registers all listeners before subscribing
+  const { broadcastReveal, broadcastClear } = useSessionRealtime({
+    sessionId: session?.id ?? null,
+    sessionCode,
+    userId,
+    displayName,
+    onVoteChange: handleVoteChange,
+    onPlayerJoin: handlePlayerJoin,
+    onReveal: handleRemoteReveal,
+    onClear: handleRemoteClear,
+  })
 
   // Load session data
   useEffect(() => {
@@ -117,7 +120,10 @@ export function SessionPage() {
       try {
         const playerRepo = createPlayerRepository(supabase)
         const player = await playerRepo.create(session.id, userId, displayName)
-        setPlayers((prev) => [...prev, player])
+        setPlayers((prev) => {
+          if (prev.some((p) => p.id === player.id)) return prev
+          return [...prev, player]
+        })
       } catch {
         const playerRepo = createPlayerRepository(supabase)
         const sessionPlayers = await playerRepo.findBySession(session.id)
