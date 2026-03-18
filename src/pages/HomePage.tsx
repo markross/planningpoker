@@ -1,13 +1,11 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { NameEntry } from '../components/home/NameEntry'
 import { CreateSessionForm } from '../components/home/CreateSessionForm'
 import { JoinSessionForm } from '../components/home/JoinSessionForm'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
-import { createSessionRepository } from '../repositories/sessionRepository'
-import { createPlayerRepository } from '../repositories/playerRepository'
-import { generateSessionCode } from '../lib/sessionCode'
+import { createSessionService } from '../services/sessionService'
 import { supabase } from '../lib/supabase'
 
 export function HomePage() {
@@ -17,24 +15,22 @@ export function HomePage() {
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
 
+  const sessionService = useMemo(() => createSessionService(supabase), [])
+
   const handleCreateSession = useCallback(async () => {
     if (!userId || !displayName) return
     setIsCreating(true)
     setError(null)
 
     try {
-      const sessionRepo = createSessionRepository(supabase)
-      const playerRepo = createPlayerRepository(supabase)
-      const code = generateSessionCode()
-      const session = await sessionRepo.create(code, userId)
-      await playerRepo.create(session.id, userId, displayName)
-      navigate(`/session/${code}`)
+      const { sessionCode } = await sessionService.createSession(userId, displayName)
+      navigate(`/session/${sessionCode}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create session')
     } finally {
       setIsCreating(false)
     }
-  }, [userId, displayName, navigate])
+  }, [userId, displayName, navigate, sessionService])
 
   const handleJoin = useCallback(
     (code: string) => {

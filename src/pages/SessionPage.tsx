@@ -1,4 +1,3 @@
-import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { SessionHeader } from '../components/session/SessionHeader'
 import { CardDeck } from '../components/session/CardDeck'
@@ -9,26 +8,7 @@ import { NameEntry } from '../components/home/NameEntry'
 import { Button } from '../components/ui/Button'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
-import { useSessionRealtime } from '../hooks/useSessionRealtime'
-import { createSessionRepository } from '../repositories/sessionRepository'
-import { createPlayerRepository } from '../repositories/playerRepository'
-import { createVoteRepository } from '../repositories/voteRepository'
-import { supabase } from '../lib/supabase'
-import type { Session } from '../types/session'
-import type { Player } from '../types/player'
-import type { Vote } from '../types/vote'
-import type { Estimate } from '../constants/estimates'
-
-type GamePhase = 'LOBBY' | 'VOTING' | 'REVEALED'
-
-function derivePhase(
-  votes: ReadonlyMap<string, Vote>,
-  isRevealed: boolean,
-): GamePhase {
-  if (isRevealed) return 'REVEALED'
-  if (votes.size > 0) return 'VOTING'
-  return 'LOBBY'
-}
+import { useGameState } from '../hooks/useGameState'
 
 export function SessionPage() {
   const { sessionCode } = useParams<{ sessionCode: string }>()
@@ -36,147 +16,18 @@ export function SessionPage() {
   const { userId, isLoading: authLoading } = useAuth()
   const [displayName, setDisplayName] = useLocalStorage('displayName', '')
 
-  const [session, setSession] = useState<Session | null>(null)
-  const [players, setPlayers] = useState<readonly Player[]>([])
-  const [votes, setVotes] = useState<ReadonlyMap<string, Vote>>(new Map())
-  const [selectedEstimate, setSelectedEstimate] = useState<Estimate | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const currentPlayer = players.find((p) => p.userId === userId)
-  const gamePhase = derivePhase(votes, session?.isRevealed ?? false)
-
-  // Realtime callbacks
-  const handleVoteChange = useCallback((vote: Vote) => {
-    setVotes((prev) => new Map([...prev, [vote.playerId, vote]]))
-  }, [])
-
-  const handlePlayerJoin = useCallback((player: Player) => {
-    setPlayers((prev) => {
-      if (prev.some((p) => p.id === player.id)) return prev
-      return [...prev, player]
-    })
-  }, [])
-
-  const handleRemoteReveal = useCallback(() => {
-    setSession((prev) => (prev ? { ...prev, isRevealed: true } : prev))
-  }, [])
-
-  const handleRemoteClear = useCallback(() => {
-    setSession((prev) => (prev ? { ...prev, isRevealed: false } : prev))
-    setVotes(new Map())
-    setSelectedEstimate(null)
-  }, [])
-
-  // Single coordinated realtime hook — registers all listeners before subscribing
-  const { broadcastReveal, broadcastClear } = useSessionRealtime({
-    sessionId: session?.id ?? null,
-    sessionCode,
-    userId,
-    displayName,
-    onVoteChange: handleVoteChange,
-    onPlayerJoin: handlePlayerJoin,
-    onReveal: handleRemoteReveal,
-    onClear: handleRemoteClear,
-  })
-
-  // Load session data
-  useEffect(() => {
-    if (!sessionCode || !userId || authLoading) return
-
-    const load = async () => {
-      try {
-        const sessionRepo = createSessionRepository(supabase)
-        const found = await sessionRepo.findByCode(sessionCode)
-        if (!found) {
-          navigate('/', { replace: true })
-          return
-        }
-        setSession(found)
-
-        const playerRepo = createPlayerRepository(supabase)
-        const sessionPlayers = await playerRepo.findBySession(found.id)
-        setPlayers(sessionPlayers)
-
-        const voteRepo = createVoteRepository(supabase)
-        const sessionVotes = await voteRepo.findBySession(found.id)
-        const voteMap = new Map(sessionVotes.map((v) => [v.playerId, v]))
-        setVotes(voteMap)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load session')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    load()
-  }, [sessionCode, userId, authLoading, navigate])
-
-  // Auto-join session when name is set
-  useEffect(() => {
-    if (!session || !userId || !displayName || currentPlayer) return
-
-    const join = async () => {
-      try {
-        const playerRepo = createPlayerRepository(supabase)
-        const player = await playerRepo.create(session.id, userId, displayName)
-        setPlayers((prev) => {
-          if (prev.some((p) => p.id === player.id)) return prev
-          return [...prev, player]
-        })
-      } catch {
-        const playerRepo = createPlayerRepository(supabase)
-        const sessionPlayers = await playerRepo.findBySession(session.id)
-        setPlayers(sessionPlayers)
-      }
-    }
-
-    join()
-  }, [session, userId, displayName, currentPlayer])
-
-  const handleSelectEstimate = useCallback(
-    async (estimate: Estimate) => {
-      if (!session || !currentPlayer) return
-      setSelectedEstimate(estimate)
-
-      try {
-        const voteRepo = createVoteRepository(supabase)
-        const vote = await voteRepo.upsert(session.id, currentPlayer.id, estimate)
-        setVotes((prev) => new Map([...prev, [currentPlayer.id, vote]]))
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to submit vote')
-      }
-    },
-    [session, currentPlayer],
-  )
-
-  const handleReveal = useCallback(async () => {
-    if (!session) return
-    try {
-      const sessionRepo = createSessionRepository(supabase)
-      await sessionRepo.updateRevealed(session.id, true)
-      setSession({ ...session, isRevealed: true })
-      broadcastReveal()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reveal votes')
-    }
-  }, [session, broadcastReveal])
-
-  const handleClear = useCallback(async () => {
-    if (!session) return
-    try {
-      const voteRepo = createVoteRepository(supabase)
-      await voteRepo.deleteBySession(session.id)
-      const sessionRepo = createSessionRepository(supabase)
-      await sessionRepo.updateRevealed(session.id, false)
-      setSession({ ...session, isRevealed: false })
-      setVotes(new Map())
-      setSelectedEstimate(null)
-      broadcastClear()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to clear votes')
-    }
-  }, [session, broadcastClear])
+  const {
+    session,
+    players,
+    votes,
+    myVote,
+    gamePhase,
+    isLoading,
+    error,
+    selectEstimate,
+    reveal,
+    clear,
+  } = useGameState({ sessionCode, userId, displayName, authLoading })
 
   if (authLoading || isLoading) {
     return (
@@ -200,6 +51,18 @@ export function SessionPage() {
   }
 
   if (!session) {
+    if (error) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center space-y-2">
+            <p className="text-gray-500">Session not found</p>
+            <Button variant="ghost" onClick={() => navigate('/', { replace: true })}>
+              Go home
+            </Button>
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-gray-500">Session not found</p>
@@ -221,8 +84,8 @@ export function SessionPage() {
         </div>
 
         <CardDeck
-          selectedEstimate={selectedEstimate}
-          onSelect={handleSelectEstimate}
+          selectedEstimate={myVote}
+          onSelect={selectEstimate}
           disabled={gamePhase === 'REVEALED'}
         />
 
@@ -242,12 +105,12 @@ export function SessionPage() {
 
             <div className="flex gap-3 justify-center">
               {gamePhase !== 'REVEALED' && (
-                <Button onClick={handleReveal} disabled={votes.size === 0}>
+                <Button onClick={reveal} disabled={votes.size === 0}>
                   Reveal votes
                 </Button>
               )}
               {gamePhase === 'REVEALED' && (
-                <Button onClick={handleClear}>New round</Button>
+                <Button onClick={clear}>New round</Button>
               )}
             </div>
           </div>
