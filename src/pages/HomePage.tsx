@@ -52,9 +52,6 @@ export function HomePage() {
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <h1 className="text-4xl font-bold text-gray-900">Planning Poker</h1>
-          <p className="mt-2 text-gray-600">
-            Estimate as a team using fibonacci values
-          </p>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
