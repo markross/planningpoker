@@ -1,6 +1,5 @@
 import { Badge } from '../ui/Badge'
-
-type GamePhase = 'LOBBY' | 'VOTING' | 'REVEALED'
+import type { GamePhase } from '../../types/gamePhase'
 
 interface SessionHeaderProps {
   readonly sessionCode: string
@@ -20,7 +19,7 @@ export function SessionHeader({
   playerCount,
 }: SessionHeaderProps) {
   return (
-    <div className="flex items-center justify-between p-4 border-b border-gray-200">
+    <header className="flex flex-col sm:flex-row items-center justify-between gap-2 p-4 border-b border-gray-200">
       <div className="flex items-center gap-3">
         <h1 className="text-xl font-bold text-gray-900">Planning Poker</h1>
         <Badge>{sessionCode}</Badge>
@@ -35,6 +34,6 @@ export function SessionHeader({
           {phaseLabels[gamePhase]}
         </Badge>
       </div>
-    </div>
+    </header>
   )
 }

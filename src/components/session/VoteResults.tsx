@@ -25,25 +25,29 @@ export function VoteResults({ votes }: VoteResultsProps) {
   const consensus = hasConsensus(voteValues)
   const unsureCount = voteValues.filter((v) => v === '?').length
 
+  const averageText = average !== null ? average.toFixed(1) : '-'
+  const spreadText = spread ? `${spread.min}–${spread.max}` : '-'
+  const consensusText = consensus ? 'Yes' : 'No'
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
       <h3 className="font-semibold text-gray-900">Results</h3>
-      <div className="grid grid-cols-3 gap-4 text-center">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
         <div>
-          <p className="text-2xl font-bold text-indigo-600">
-            {average !== null ? average.toFixed(1) : '-'}
+          <p className="text-2xl font-bold text-indigo-600" aria-label={`Average: ${averageText}`}>
+            {averageText}
           </p>
           <p className="text-xs text-gray-500">Average</p>
         </div>
         <div>
-          <p className="text-2xl font-bold text-gray-800">
-            {spread ? `${spread.min}–${spread.max}` : '-'}
+          <p className="text-2xl font-bold text-gray-800" aria-label={`Spread: ${spreadText}`}>
+            {spreadText}
           </p>
           <p className="text-xs text-gray-500">Spread</p>
         </div>
         <div>
-          <p className="text-2xl font-bold text-gray-800">
-            {consensus ? 'Yes' : 'No'}
+          <p className="text-2xl font-bold text-gray-800" aria-label={`Consensus: ${consensusText}`}>
+            {consensusText}
           </p>
           <p className="text-xs text-gray-500">Consensus</p>
         </div>

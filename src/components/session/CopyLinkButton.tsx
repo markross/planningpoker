@@ -16,7 +16,7 @@ export function CopyLinkButton({ sessionCode }: CopyLinkButtonProps) {
   }, [sessionCode])
 
   return (
-    <Button variant="ghost" onClick={handleCopy}>
+    <Button variant="ghost" onClick={handleCopy} aria-label="Copy session link">
       {copied ? 'Copied!' : 'Copy link'}
     </Button>
   )
