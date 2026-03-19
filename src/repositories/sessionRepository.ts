@@ -43,6 +43,16 @@ export function createSessionRepository(client: SupabaseClient) {
       return data ? toSession(data) : null
     },
 
+    async checkCodeExists(sessionCode: string): Promise<boolean> {
+      const { count, error } = await client
+        .from('poker_sessions')
+        .select('*', { count: 'exact', head: true })
+        .eq('session_code', sessionCode)
+
+      if (error) throw new Error(error.message)
+      return (count ?? 0) > 0
+    },
+
     async updateRevealed(id: string, isRevealed: boolean): Promise<void> {
       const { error } = await client
         .from('poker_sessions')

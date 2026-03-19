@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createSessionRepository } from '../repositories/sessionRepository'
 import { createPlayerRepository } from '../repositories/playerRepository'
 import { generateSessionCode } from '../lib/sessionCode'
+import { validateSessionSlug } from '../lib/sessionSlug'
 import type { Session } from '../types/session'
 
 interface CreateSessionResult {
@@ -17,8 +18,22 @@ export function createSessionService(client: SupabaseClient) {
     async createSession(
       userId: string,
       displayName: string,
+      customSlug?: string,
     ): Promise<CreateSessionResult> {
-      const code = generateSessionCode()
+      let code: string
+
+      if (customSlug) {
+        const validationError = validateSessionSlug(customSlug)
+        if (validationError) throw new Error(validationError)
+
+        const exists = await sessionRepo.checkCodeExists(customSlug)
+        if (exists) throw new Error('That session name is already taken')
+
+        code = customSlug
+      } else {
+        code = generateSessionCode()
+      }
+
       const session = await sessionRepo.create(code, userId)
       await playerRepo.create(session.id, userId, displayName)
       return { session, sessionCode: code }

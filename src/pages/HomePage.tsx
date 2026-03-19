@@ -17,13 +17,13 @@ export function HomePage() {
 
   const sessionService = useMemo(() => createSessionService(supabase), [])
 
-  const handleCreateSession = useCallback(async () => {
+  const handleCreateSession = useCallback(async (customSlug?: string) => {
     if (!userId || !displayName) return
     setIsCreating(true)
     setError(null)
 
     try {
-      const { sessionCode } = await sessionService.createSession(userId, displayName)
+      const { sessionCode } = await sessionService.createSession(userId, displayName, customSlug)
       navigate(`/session/${sessionCode}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create session')
