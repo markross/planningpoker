@@ -75,4 +75,22 @@ describe('playerRepository', () => {
       expect(qb.eq).toHaveBeenCalledWith('id', 'p-1')
     })
   })
+
+  describe('removeBySession', () => {
+    it('deletes all players for a session', async () => {
+      qb.eq.mockResolvedValueOnce({ data: null, error: null })
+
+      await repo.removeBySession('s-1')
+
+      expect(mockClient.from).toHaveBeenCalledWith('poker_players')
+      expect(qb.delete).toHaveBeenCalled()
+      expect(qb.eq).toHaveBeenCalledWith('session_id', 's-1')
+    })
+
+    it('throws when deletion fails', async () => {
+      qb.eq.mockResolvedValueOnce({ error: { message: 'db error' } })
+
+      await expect(repo.removeBySession('s-1')).rejects.toThrow('db error')
+    })
+  })
 })

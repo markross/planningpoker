@@ -123,7 +123,6 @@ export function SessionPage() {
                 onClick={() => {
                   if (window.confirm('Reset this session? This will remove all players and everyone will need to re-enter their name.')) {
                     resetSession()
-                    setDisplayName('')
                   }
                 }}
               >

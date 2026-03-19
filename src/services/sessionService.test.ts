@@ -127,4 +127,27 @@ describe('sessionService', () => {
       ).resolves.toBeUndefined()
     })
   })
+
+  describe('resetSession', () => {
+    it('deletes votes, removes players, and resets revealed state', async () => {
+      mockClient._queryBuilder.eq
+        .mockResolvedValueOnce({ error: null })  // voteRepo.deleteBySession
+        .mockResolvedValueOnce({ error: null })  // playerRepo.removeBySession
+        .mockResolvedValueOnce({ error: null })  // sessionRepo.updateRevealed
+
+      await expect(service.resetSession('sess-1')).resolves.toBeUndefined()
+
+      expect(mockClient.from).toHaveBeenCalledWith('poker_votes')
+      expect(mockClient.from).toHaveBeenCalledWith('poker_players')
+      expect(mockClient.from).toHaveBeenCalledWith('poker_sessions')
+    })
+
+    it('throws when vote deletion fails', async () => {
+      mockClient._queryBuilder.eq.mockResolvedValueOnce({
+        error: { message: 'delete failed' },
+      })
+
+      await expect(service.resetSession('sess-1')).rejects.toThrow('delete failed')
+    })
+  })
 })

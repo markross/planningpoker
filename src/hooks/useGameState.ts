@@ -187,15 +187,16 @@ export function useGameState({
     if (!session) return
     try {
       await sessionService.resetSession(session.id)
+      broadcastReset()
       setPlayers([])
       setVotes(new Map())
       setSelectedEstimate(null)
       setSession({ ...session, isRevealed: false })
-      broadcastReset()
+      onSessionReset?.()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to reset session')
     }
-  }, [session, broadcastReset, sessionService])
+  }, [session, broadcastReset, sessionService, onSessionReset])
 
   return {
     session,
