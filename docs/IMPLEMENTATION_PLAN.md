@@ -293,7 +293,7 @@ e2e/tests/*.spec.ts, e2e/playwright.config.ts
 
 ---
 
-## Stage 7: Polish & Deploy (PARTIAL)
+## Stage 7: Polish & Deploy ✅
 
 **Goal**: Production-ready, deployed to Vercel, accessible.
 
@@ -318,32 +318,57 @@ Deleted unused hooks replaced by `useSessionRealtime.ts`:
 - `VoteResults`: `grid-cols-1 sm:grid-cols-3` (was grid-cols-3)
 - `SessionHeader`: `flex-col sm:flex-row` for small screens
 
-### 7d. Vercel deployment — NOT YET DONE
+### 7d. Vercel deployment ✅
 
-**Backend**: Supabase free tier (cloud project)
-1. Create Supabase cloud project at supabase.com
-2. Enable anonymous sign-ins in Authentication → Providers
-3. Run migrations: `supabase db push --linked`
-4. Copy Project URL + anon key
+**Backend**: Supabase cloud (free tier)
+- Cloud project created with anonymous sign-ins enabled
+- Migrations pushed via `supabase link` + `supabase db push`
+- Additional migration added: `GRANT` table permissions to `authenticated` role (cloud doesn't auto-grant like local dev)
+- Additional migration added: `GRANT SELECT` to `anon` role for Realtime
 
-**Frontend**: Vercel free tier
-1. Push repo to GitHub
-2. Connect repo in Vercel dashboard (or `npx vercel`)
-3. Set environment variables in Vercel project settings:
-   - `VITE_SUPABASE_URL` → cloud project URL
-   - `VITE_SUPABASE_ANON_KEY` → cloud anon/publishable key
-4. Framework preset: Vite (auto-detected)
-5. Build command: `npm run build` → output: `dist/`
-6. Verify: SPA routing works, create session from deployed URL
+**Frontend**: Vercel (free tier)
+- GitHub repo: `markross/planningpoker` (public)
+- Connected to Vercel via `npx vercel` + GitHub integration
+- Env vars set: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+- Deployment protection disabled for public access
+- Live at: https://scrumpoker-rho.vercel.app
+
+**Gotchas encountered**:
+- Vercel Hobby blocks deploys without a git user linked to the account — commit email must match GitHub account
+- Piping env vars via `echo | vercel env add` can introduce trailing newlines — use `--value` flag instead
+- Cloud Supabase requires explicit `GRANT` on tables (local dev auto-grants)
 
 ### Acceptance criteria
 - ✅ Dead code removed, build passes
 - ✅ ARIA improvements applied
 - ✅ Usable at 320px width
-- ❌ Deployed to Vercel, full flow works end-to-end
-- ❌ Supabase cloud project with migrations applied
+- ✅ Deployed to Vercel, full flow works end-to-end
+- ✅ Supabase cloud project with migrations applied
 
 **Dependencies**: Stages 1–6
+
+---
+
+## Stage 8: Session Cleanup Cron ✅
+
+**Goal**: Automatically delete abandoned sessions daily via pg_cron.
+
+**What gets built**:
+
+### SQL migration (`20260318000003_session_cleanup_cron.sql`)
+- Enables `pg_cron` extension
+- `delete_expired_sessions()` function — deletes sessions where:
+  - Last vote `updated_at` is older than 24 hours, OR
+  - Session has zero votes and `created_at` is older than 24 hours
+- Cron job scheduled at `0 0 * * *` (midnight UTC daily)
+- Child rows (`poker_players`, `poker_votes`) cleaned up via existing `ON DELETE CASCADE` FKs
+
+### Verification
+- `select * from cron.job;` — confirm job is scheduled
+- `select delete_expired_sessions();` — test manually
+- `select * from cron.job_run_details order by start_time desc limit 5;` — check run history
+
+**Dependencies**: Stage 2 (schema)
 
 ---
 
@@ -351,6 +376,7 @@ Deleted unused hooks replaced by `useSessionRealtime.ts`:
 
 ```
 1 → 2 → 3 → 4 → 5 → 6 → 7
+         ↘ 8 (session cleanup cron)
 ```
 
 TDD runs throughout — each stage writes tests for its own code. Stage 6 adds the comprehensive coverage pass and E2E.
