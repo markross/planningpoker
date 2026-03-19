@@ -58,5 +58,14 @@ export function createPlayerRepository(client: SupabaseClient) {
 
       if (error) throw new Error(error.message)
     },
+
+    async removeBySession(sessionId: string): Promise<void> {
+      const { error } = await client
+        .from('poker_players')
+        .delete()
+        .eq('session_id', sessionId)
+
+      if (error) throw new Error(error.message)
+    },
   }
 }

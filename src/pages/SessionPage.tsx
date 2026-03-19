@@ -9,12 +9,17 @@ import { Button } from '../components/ui/Button'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useGameState } from '../hooks/useGameState'
+import { useCallback } from 'react'
 
 export function SessionPage() {
   const { sessionCode } = useParams<{ sessionCode: string }>()
   const navigate = useNavigate()
   const { userId, isLoading: authLoading } = useAuth()
   const [displayName, setDisplayName] = useLocalStorage('displayName', '')
+
+  const handleSessionReset = useCallback(() => {
+    setDisplayName('')
+  }, [setDisplayName])
 
   const {
     session,
@@ -27,7 +32,8 @@ export function SessionPage() {
     selectEstimate,
     reveal,
     clear,
-  } = useGameState({ sessionCode, userId, displayName, authLoading })
+    resetSession,
+  } = useGameState({ sessionCode, userId, displayName, authLoading, onSessionReset: handleSessionReset })
 
   if (authLoading || isLoading) {
     return (
@@ -112,6 +118,17 @@ export function SessionPage() {
               {gamePhase === 'REVEALED' && (
                 <Button onClick={clear}>New round</Button>
               )}
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  if (window.confirm('Reset this session? This will remove all players and everyone will need to re-enter their name.')) {
+                    resetSession()
+                    setDisplayName('')
+                  }
+                }}
+              >
+                Reset session
+              </Button>
             </div>
           </div>
         </div>

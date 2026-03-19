@@ -51,11 +51,13 @@ interface UseSessionRealtimeParams {
   readonly onPlayerJoin: (player: Player) => void
   readonly onReveal: () => void
   readonly onClear: () => void
+  readonly onReset: () => void
 }
 
 interface UseSessionRealtimeResult {
   readonly broadcastReveal: () => void
   readonly broadcastClear: () => void
+  readonly broadcastReset: () => void
 }
 
 export function useSessionRealtime({
@@ -67,6 +69,7 @@ export function useSessionRealtime({
   onPlayerJoin,
   onReveal,
   onClear,
+  onReset,
 }: UseSessionRealtimeParams): UseSessionRealtimeResult {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
@@ -75,11 +78,13 @@ export function useSessionRealtime({
   const onPlayerJoinRef = useRef(onPlayerJoin)
   const onRevealRef = useRef(onReveal)
   const onClearRef = useRef(onClear)
+  const onResetRef = useRef(onReset)
 
   useEffect(() => { onVoteChangeRef.current = onVoteChange }, [onVoteChange])
   useEffect(() => { onPlayerJoinRef.current = onPlayerJoin }, [onPlayerJoin])
   useEffect(() => { onRevealRef.current = onReveal }, [onReveal])
   useEffect(() => { onClearRef.current = onClear }, [onClear])
+  useEffect(() => { onResetRef.current = onReset }, [onReset])
 
   useEffect(() => {
     if (!sessionCode || !sessionId || !userId || !displayName) return
@@ -128,6 +133,10 @@ export function useSessionRealtime({
       onClearRef.current()
     })
 
+    ch.on('broadcast', { event: REALTIME_EVENTS.RESET }, () => {
+      onResetRef.current()
+    })
+
     // 4. Presence
     ch.on('presence', { event: 'sync' }, () => {
       // Presence sync — could expose online users if needed
@@ -162,5 +171,13 @@ export function useSessionRealtime({
     })
   }, [])
 
-  return { broadcastReveal, broadcastClear }
+  const broadcastReset = useCallback(() => {
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: REALTIME_EVENTS.RESET,
+      payload: {},
+    })
+  }, [])
+
+  return { broadcastReveal, broadcastClear, broadcastReset }
 }

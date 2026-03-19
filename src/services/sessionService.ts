@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createSessionRepository } from '../repositories/sessionRepository'
 import { createPlayerRepository } from '../repositories/playerRepository'
+import { createVoteRepository } from '../repositories/voteRepository'
 import { generateSessionCode } from '../lib/sessionCode'
 import { validateSessionSlug } from '../lib/sessionSlug'
 import type { Session } from '../types/session'
@@ -13,6 +14,7 @@ interface CreateSessionResult {
 export function createSessionService(client: SupabaseClient) {
   const sessionRepo = createSessionRepository(client)
   const playerRepo = createPlayerRepository(client)
+  const voteRepo = createVoteRepository(client)
 
   return {
     async createSession(
@@ -49,6 +51,12 @@ export function createSessionService(client: SupabaseClient) {
       } catch {
         // Player may already exist (unique constraint) — refresh list silently
       }
+    },
+
+    async resetSession(sessionId: string): Promise<void> {
+      await voteRepo.deleteBySession(sessionId)
+      await playerRepo.removeBySession(sessionId)
+      await sessionRepo.updateRevealed(sessionId, false)
     },
 
     async loadSession(sessionCode: string) {

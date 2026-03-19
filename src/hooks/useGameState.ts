@@ -15,6 +15,7 @@ interface UseGameStateParams {
   readonly userId: string | null
   readonly displayName: string
   readonly authLoading: boolean
+  readonly onSessionReset?: () => void
 }
 
 interface UseGameStateResult {
@@ -29,6 +30,7 @@ interface UseGameStateResult {
   readonly selectEstimate: (estimate: Estimate) => Promise<void>
   readonly reveal: () => Promise<void>
   readonly clear: () => Promise<void>
+  readonly resetSession: () => Promise<void>
 }
 
 export function useGameState({
@@ -36,6 +38,7 @@ export function useGameState({
   userId,
   displayName,
   authLoading,
+  onSessionReset,
 }: UseGameStateParams): UseGameStateResult {
   const [session, setSession] = useState<Session | null>(null)
   const [players, setPlayers] = useState<readonly Player[]>([])
@@ -72,7 +75,15 @@ export function useGameState({
     setSelectedEstimate(null)
   }, [])
 
-  const { broadcastReveal, broadcastClear } = useSessionRealtime({
+  const handleRemoteReset = useCallback(() => {
+    setPlayers([])
+    setVotes(new Map())
+    setSelectedEstimate(null)
+    setSession((prev) => (prev ? { ...prev, isRevealed: false } : prev))
+    onSessionReset?.()
+  }, [onSessionReset])
+
+  const { broadcastReveal, broadcastClear, broadcastReset } = useSessionRealtime({
     sessionId: session?.id ?? null,
     sessionCode,
     userId,
@@ -81,6 +92,7 @@ export function useGameState({
     onPlayerJoin: handlePlayerJoin,
     onReveal: handleRemoteReveal,
     onClear: handleRemoteClear,
+    onReset: handleRemoteReset,
   })
 
   // Load session data
@@ -171,6 +183,20 @@ export function useGameState({
     }
   }, [session, broadcastClear, voteService])
 
+  const resetSession = useCallback(async () => {
+    if (!session) return
+    try {
+      await sessionService.resetSession(session.id)
+      setPlayers([])
+      setVotes(new Map())
+      setSelectedEstimate(null)
+      setSession({ ...session, isRevealed: false })
+      broadcastReset()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reset session')
+    }
+  }, [session, broadcastReset, sessionService])
+
   return {
     session,
     players,
@@ -183,5 +209,6 @@ export function useGameState({
     selectEstimate,
     reveal,
     clear,
+    resetSession,
   }
 }
