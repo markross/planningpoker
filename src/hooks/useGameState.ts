@@ -103,6 +103,10 @@ export function useGameState({
         const voteMap = await voteService.loadVotes(result.session.id)
         if (cancelled) return
         setVotes(voteMap)
+
+        const myPlayer = result.players.find((p) => p.userId === userId)
+        const existingVote = myPlayer ? voteMap.get(myPlayer.id) : undefined
+        if (existingVote?.estimate) setSelectedEstimate(existingVote.estimate)
       } catch (err) {
         if (cancelled) return
         setError(err instanceof Error ? err.message : 'Failed to load session')

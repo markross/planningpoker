@@ -47,4 +47,23 @@ describe('VoteResults', () => {
     const { container } = render(<VoteResults votes={votes} />)
     expect(within(container).getByText('1 player unsure')).toBeInTheDocument()
   })
+
+  it('recalculates results when a vote changes after reveal', () => {
+    const initialVotes = new Map([
+      ['p1', buildVote({ playerId: 'p1', estimate: '3' })],
+      ['p2', buildVote({ playerId: 'p2', estimate: '5' })],
+    ])
+    const { container, rerender } = render(<VoteResults votes={initialVotes} />)
+    expect(within(container).getByText('4.0')).toBeInTheDocument()
+
+    // p2 changes their vote from 5 to 3 (post-reveal re-vote)
+    const updatedVotes = new Map([
+      ['p1', buildVote({ playerId: 'p1', estimate: '3' })],
+      ['p2', buildVote({ playerId: 'p2', estimate: '3' })],
+    ])
+    rerender(<VoteResults votes={updatedVotes} />)
+
+    expect(within(container).getByText('3.0')).toBeInTheDocument()
+    expect(within(container).getByText('Yes')).toBeInTheDocument()
+  })
 })

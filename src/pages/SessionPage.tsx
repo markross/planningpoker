@@ -86,7 +86,7 @@ export function SessionPage() {
         <CardDeck
           selectedEstimate={myVote}
           onSelect={selectEstimate}
-          disabled={gamePhase === 'REVEALED'}
+          isRevealed={gamePhase === 'REVEALED'}
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

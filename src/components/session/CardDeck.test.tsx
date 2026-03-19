@@ -45,4 +45,29 @@ describe('CardDeck', () => {
     const { buttons } = renderDeck({ disabled: true })
     buttons.forEach((btn) => expect(btn).toBeDisabled())
   })
+
+  it('shows hint text when isRevealed', () => {
+    const { container } = renderDeck({ isRevealed: true })
+    expect(within(container).getByText('Votes revealed — click to change your vote')).toBeInTheDocument()
+  })
+
+  it('does not show hint text when not revealed', () => {
+    const { container } = renderDeck({ isRevealed: false })
+    expect(within(container).queryByText('Votes revealed — click to change your vote')).not.toBeInTheDocument()
+  })
+
+  it('cards are not disabled when isRevealed', () => {
+    const { buttons } = renderDeck({ isRevealed: true })
+    buttons.forEach((btn) => expect(btn).not.toBeDisabled())
+  })
+
+  it('calls onSelect when clicking a card in revealed state', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+    const { buttons } = renderDeck({ isRevealed: true, onSelect })
+
+    const threeButton = buttons.find((b) => b.textContent === '3')!
+    await user.click(threeButton)
+    expect(onSelect).toHaveBeenCalledWith('3')
+  })
 })
