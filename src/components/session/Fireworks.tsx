@@ -11,15 +11,6 @@ interface Particle {
   size: number
 }
 
-interface Rocket {
-  x: number
-  y: number
-  vy: number
-  targetY: number
-  exploded: boolean
-  color: string
-}
-
 const COLORS = [
   '#6366f1', // indigo
   '#8b5cf6', // violet
@@ -35,12 +26,13 @@ function randomColor(): string {
   return COLORS[Math.floor(Math.random() * COLORS.length)]
 }
 
-function createParticles(x: number, y: number, color: string): readonly Particle[] {
-  const count = 30 + Math.floor(Math.random() * 20)
+function createBurst(x: number, y: number): readonly Particle[] {
+  const color = randomColor()
+  const count = 40 + Math.floor(Math.random() * 20)
   return Array.from({ length: count }, () => {
     const angle = Math.random() * Math.PI * 2
-    const speed = 1 + Math.random() * 3
-    const maxLife = 40 + Math.floor(Math.random() * 30)
+    const speed = 2 + Math.random() * 5
+    const maxLife = 50 + Math.floor(Math.random() * 40)
     return {
       x,
       y,
@@ -49,7 +41,7 @@ function createParticles(x: number, y: number, color: string): readonly Particle
       life: maxLife,
       maxLife,
       color,
-      size: 1.5 + Math.random() * 1.5,
+      size: 2 + Math.random() * 2,
     }
   })
 }
@@ -64,92 +56,74 @@ export function Fireworks() {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    let animationId: number
-    let rockets: Rocket[] = []
+    let animationId = 0
+    let cancelled = false
     let particles: Particle[] = []
     let frameCount = 0
-    const duration = 180 // ~3 seconds at 60fps
 
     function resize() {
       if (!canvas) return
-      canvas.width = canvas.offsetWidth * window.devicePixelRatio
-      canvas.height = canvas.offsetHeight * window.devicePixelRatio
-      ctx!.scale(window.devicePixelRatio, window.devicePixelRatio)
+      const dpr = window.devicePixelRatio || 1
+      canvas.width = canvas.offsetWidth * dpr
+      canvas.height = canvas.offsetHeight * dpr
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0)
     }
 
     resize()
     window.addEventListener('resize', resize)
 
-    function launchRocket() {
+    function spawnBurst() {
       if (!canvas) return
       const w = canvas.offsetWidth
       const h = canvas.offsetHeight
-      rockets.push({
-        x: w * 0.2 + Math.random() * w * 0.6,
-        y: h,
-        vy: -(4 + Math.random() * 3),
-        targetY: h * 0.15 + Math.random() * h * 0.35,
-        exploded: false,
-        color: randomColor(),
-      })
+      const x = w * 0.15 + Math.random() * w * 0.7
+      const y = h * 0.1 + Math.random() * h * 0.4
+      particles = [...particles, ...createBurst(x, y)]
     }
 
-    // Launch initial burst
-    for (let i = 0; i < 3; i++) {
-      setTimeout(() => launchRocket(), i * 200)
-    }
+    // Immediate burst on mount
+    spawnBurst()
+    spawnBurst()
+    spawnBurst()
+
+    // Schedule more bursts
+    const timers = [
+      setTimeout(() => { if (!cancelled) { spawnBurst(); spawnBurst() } }, 300),
+      setTimeout(() => { if (!cancelled) { spawnBurst(); spawnBurst() } }, 700),
+      setTimeout(() => { if (!cancelled) { spawnBurst() } }, 1100),
+      setTimeout(() => { if (!cancelled) { spawnBurst() } }, 1500),
+    ]
 
     function tick() {
-      if (!canvas || !ctx) return
+      if (cancelled || !canvas || !ctx) return
       const w = canvas.offsetWidth
       const h = canvas.offsetHeight
 
       ctx.clearRect(0, 0, w, h)
       frameCount++
 
-      // Launch more rockets periodically
-      if (frameCount < 120 && frameCount % 25 === 0) {
-        launchRocket()
-      }
-
-      // Update rockets
-      rockets = rockets.filter((r) => {
-        if (r.exploded) return false
-        r.y += r.vy
-        // Draw rocket trail
-        ctx!.beginPath()
-        ctx!.arc(r.x, r.y, 2, 0, Math.PI * 2)
-        ctx!.fillStyle = r.color
-        ctx!.fill()
-
-        if (r.y <= r.targetY) {
-          r.exploded = true
-          particles = [...particles, ...createParticles(r.x, r.y, r.color)]
-          return false
-        }
-        return true
-      })
-
-      // Update particles
       particles = particles.filter((p) => {
         p.x += p.vx
         p.y += p.vy
-        p.vy += 0.05 // gravity
-        p.vx *= 0.99 // drag
+        p.vy += 0.06 // gravity
+        p.vx *= 0.98 // drag
         p.life--
 
-        const alpha = p.life / p.maxLife
-        ctx!.beginPath()
-        ctx!.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2)
-        ctx!.fillStyle = p.color
+        const alpha = Math.max(0, p.life / p.maxLife)
+        const radius = p.size * (0.3 + 0.7 * alpha)
+
         ctx!.globalAlpha = alpha
+        ctx!.fillStyle = p.color
+        ctx!.beginPath()
+        ctx!.arc(p.x, p.y, radius, 0, Math.PI * 2)
         ctx!.fill()
-        ctx!.globalAlpha = 1
 
         return p.life > 0
       })
 
-      if (frameCount < duration || particles.length > 0 || rockets.length > 0) {
+      ctx.globalAlpha = 1
+
+      if (frameCount < 200 || particles.length > 0) {
         animationId = requestAnimationFrame(tick)
       }
     }
@@ -157,7 +131,9 @@ export function Fireworks() {
     animationId = requestAnimationFrame(tick)
 
     return () => {
+      cancelled = true
       cancelAnimationFrame(animationId)
+      timers.forEach(clearTimeout)
       window.removeEventListener('resize', resize)
     }
   }, [])
@@ -166,7 +142,7 @@ export function Fireworks() {
     <canvas
       ref={canvasRef}
       className="fixed inset-0 pointer-events-none z-50"
-      style={{ width: '100%', height: '100%' }}
+      style={{ width: '100vw', height: '100vh' }}
       aria-hidden="true"
     />
   )
