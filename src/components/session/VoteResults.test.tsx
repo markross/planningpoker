@@ -36,7 +36,7 @@ describe('VoteResults', () => {
       ['p2', buildVote({ playerId: 'p2', estimate: '5' })],
     ])
     const { container } = render(<VoteResults votes={votes} />)
-    expect(within(container).getByText('Yes')).toBeInTheDocument()
+    expect(within(container).getByText('Consensus!')).toBeInTheDocument()
   })
 
   it('shows unsure count when "?" votes exist', () => {
@@ -64,6 +64,6 @@ describe('VoteResults', () => {
     rerender(<VoteResults votes={updatedVotes} />)
 
     expect(within(container).getByText('3.0')).toBeInTheDocument()
-    expect(within(container).getByText('Yes')).toBeInTheDocument()
+    expect(within(container).getByText('Consensus!')).toBeInTheDocument()
   })
 })
