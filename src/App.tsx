@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { Analytics } from '@vercel/analytics/react'
 import { AuthProvider } from './contexts/AuthContext'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { HomePage } from './pages/HomePage'
@@ -9,6 +10,7 @@ import './app.css'
 export default function App() {
   return (
     <ErrorBoundary>
+      <Analytics />
       <BrowserRouter>
         <AuthProvider>
           <Routes>
